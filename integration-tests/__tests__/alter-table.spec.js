@@ -12,6 +12,7 @@ const {
 } = require('dbgate-tools');
 
 function pickImportantTableInfo(engine, table) {
+  if (!table) return table;
   const props = ['columnName', 'defaultValue'];
   if (!engine.skipNullability) props.push('notNull');
   if (!engine.skipAutoIncrement) props.push('autoIncrement');
@@ -86,7 +87,7 @@ async function testTableDiff(engine, conn, driver, mangle, changedTable = 't1') 
     await driver.query(conn, transformSqlForEngine(engine, query));
   }
 
-  const tget = x => x.tables.find(y => y.pureName == changedTable);
+  const tget = x => x?.tables?.find(y => y.pureName == changedTable);
   const structure1Source = await driver.analyseFull(conn);
   const structure1 = generateDbPairingId(extendDatabaseInfo(structure1Source));
   let structure2 = _.cloneDeep(structure1);
@@ -94,6 +95,10 @@ async function testTableDiff(engine, conn, driver, mangle, changedTable = 't1') 
   structure2 = extendDatabaseInfo(structure2);
 
   const { sql } = getAlterTableScript(tget(structure1), tget(structure2), {}, structure1, structure2, driver);
+
+  // sleep 1s - some engines have update datetime precision only to seconds
+  await new Promise(resolve => setTimeout(resolve, 1000));
+
   console.log('RUNNING ALTER SQL', driver.engine, ':', sql);
 
   await driver.script(conn, sql);
